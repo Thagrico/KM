@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bản đồ sức khỏe đất</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+html,body{margin:0;padding:0;height:100%;}
+#map{width:100%;height:100vh;}
+.popup-table{border-collapse:collapse;width:100%;}
+.popup-table td{border:1px solid #ddd;padding:4px 6px;font-size:12px;}
+.text-label{background:transparent;border:none;box-shadow:none;font-weight:bold;font-size:16px;color:#ff0000;}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map');
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+
+let allLayers = [];
+
+// ==========================
+// POPUP CUỘN KHI NHIỀU THUỘC TÍNH
+// ==========================
+function createScrollablePopup(properties){
+    let html = '<div style="max-height:200px;overflow:auto;"><table class="popup-table">';
+    for(const key in properties){
+        html += `<tr><td><b>${key}</b></td><td>${properties[key]}</td></tr>`;
+    }
+    html += '</table></div>';
+    return html;
+}
+
+// ==========================
+// LINE LÔ ĐẬM VÀ MÀU RÕ
+// ==========================
+function addLineLO(url){
+    fetch(url)
+    .then(r=>r.json())
+    .then(data=>{
+        const layer = L.geoJSON(data,{
+            style:{color:'#000000',weight:3,fillOpacity:0}
+        }).addTo(map);
+        allLayers.push(layer);
+        layer.bringToFront();
+    });
+}
+
+// ==========================
+// HIỂN THỊ SỐ LÔ TRÊN BẢN ĐỒ
+// ==========================
+function addLotNumbers(url){
+    fetch(url)
+    .then(r=>r.json())
+    .then(data=>{
+        L.geoJSON(data,{
+            pointToLayer:(feature,latlng)=>{
+                let lotNumber = feature.properties.TEN_LO || feature.properties.XN || '';
+                return L.marker(latlng,{
+                    icon:L.divIcon({
+                        className:'text-label',
+                        html:lotNumber,
+                        iconSize:null
+                    })
+                });
+            }
+        }).addTo(map);
+    });
+}
+
+// ==========================
+// LOAD GEOJSON CÓ SẴN
+// ==========================
+const geojsonFiles = [
+    'Thua.geojson',
+    'Ranh_xn.geojson',
+    'DP1.geojson','DP2.geojson','DP3.geojson',
+    'LP1.geojson','LP3.geojson'
+];
+
+// Thêm các layer polygon & popup
+geojsonFiles.forEach(f=>{
+    fetch(f)
+    .then(r=>r.json())
+    .then(data=>{
+        const layer = L.geoJSON(data,{
+            onEachFeature:(feature,layer)=>{
+                if(feature.properties){
+                    layer.bindPopup(createScrollablePopup(feature.properties));
+                }
+            }
+        }).addTo(map);
+        allLayers.push(layer);
+    });
+});
+
+// Thêm line lô đậm
+addLineLO('Line_lo.geojson');
+
+// Thêm số lô trực tiếp trên bản đồ
+addLotNumbers('DP1.geojson');
+addLotNumbers('DP2.geojson');
+addLotNumbers('DP3.geojson');
+addLotNumbers('LP1.geojson');
+addLotNumbers('LP3.geojson');
+
+// ==========================
+// ZOOM TOÀN BỘ
+// ==========================
+function zoomAll(){
+    if(allLayers.length===0) return;
+    const group = L.featureGroup(allLayers);
+    const bounds = group.getBounds();
+    if(bounds.isValid()) map.fitBounds(bounds,{padding:[20,20]});
+}
+setTimeout(zoomAll,500);
+
+</script>
+</body>
+</html>
